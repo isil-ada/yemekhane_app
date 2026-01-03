@@ -2,21 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/dummy_data.dart';
 import 'rate_menu_screen.dart';
+import '../services/api_service.dart';
 
 class MenuDetailScreen extends StatefulWidget {
   final bool isGuest;
-  const MenuDetailScreen({super.key, this.isGuest = false});
+  final Menu? menu; // Passing menu explicitly
+
+  const MenuDetailScreen({super.key, this.isGuest = false, this.menu});
 
   @override
   State<MenuDetailScreen> createState() => _MenuDetailScreenState();
 }
 
 class _MenuDetailScreenState extends State<MenuDetailScreen> {
+  late Menu _menu;
+  List<Review> _reviews = [];
+  bool _isLoadingReviews = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fallback to dummy if null (shouldn't happen in real use from home)
+    _menu = widget.menu ?? DummyData.lunchMenus[0];
+    _fetchReviews();
+  }
+
+  Future<void> _fetchReviews() async {
+    if (_menu.id == null || _menu.id!.isEmpty) {
+        setState(() {
+            _isLoadingReviews = false;
+        });
+        return;
+    }
+
+    try {
+      final data = await ApiService.get('/comments/${_menu.id}');
+      if (data is List) {
+        setState(() {
+          _reviews = data.map((e) => Review.fromJson(e)).toList();
+          _isLoadingReviews = false;
+        });
+      }
+    } catch (e) {
+      print('Fetch reviews error: $e');
+      setState(() {
+        _isLoadingReviews = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // In a real app, we would pass arguments via ModalRoute. For now, using the first menu as dummy.
-    final Menu menu = DummyData.lunchMenus[0];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -28,9 +64,9 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
             fontSize: 18,
           ),
         ),
-        backgroundColor: const Color(0xFF0D326F), // Dark blue from header
+        backgroundColor: const Color(0xFF0D326F),
         centerTitle: true,
-        leading: const BackButton(color: Colors.white),
+        leading: BackButton(color: Colors.white, onPressed: () => Navigator.pop(context),),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -41,7 +77,7 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
               child: Column(
                 children: [
                   Text(
-                    menu.date,
+                    _menu.date,
                     style: GoogleFonts.inter(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -49,7 +85,7 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
                     ),
                   ),
                   Text(
-                    menu.dayName,
+                    _menu.dayName,
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       color: Colors.grey.shade600,
@@ -62,14 +98,20 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
 
             _buildSectionHeader('Menü İçeriği'),
             const SizedBox(height: 16),
-            ...menu.items.map((item) => _buildMenuItem(item)),
+            ..._menu.items.map((item) => _buildMenuItem(item)),
 
             const SizedBox(height: 24),
             _buildSectionHeader('Değerlendirmeler'),
             const SizedBox(height: 16),
             _buildRatingSummary(),
             const SizedBox(height: 16),
-            ...DummyData.reviews.map((review) => _buildReviewItem(review)),
+            if (_isLoadingReviews)
+              const Center(child: CircularProgressIndicator())
+            else if (_reviews.isEmpty)
+              const Center(child: Text("Henüz yorum yapılmamış."))
+            else
+              ..._reviews.map((review) => _buildReviewItem(review)),
+              
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -103,8 +145,11 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
                   }
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const RateMenuScreen()),
-                  );
+                    MaterialPageRoute(builder: (_) => RateMenuScreen(mealId: _menu.id)),
+                  ).then((_) {
+                      // refresh reviews after return
+                      _fetchReviews();
+                  });
                 },
                 icon: const Icon(Icons.star, color: Color(0xFFFFC107)),
                 label: Text(
@@ -248,7 +293,7 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
           Column(
             children: [
               Text(
-                '4.5',
+                (_menu.avgRating ?? 0).toStringAsFixed(1),
                 style: GoogleFonts.inter(
                   fontSize: 48,
                   fontWeight: FontWeight.w700,
@@ -258,16 +303,18 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
               Row(
                 children: List.generate(
                   5,
-                  (index) => Icon(
-                    index < 4 ? Icons.star : Icons.star_half,
-                    color: const Color(0xFFFFC107),
-                    size: 20,
-                  ),
+                  (index) {
+                      // Simple star logic
+                      double rating = _menu.avgRating ?? 0;
+                      if (index < rating.floor()) return const Icon(Icons.star, color: Color(0xFFFFC107), size: 20);
+                      if (index < rating) return const Icon(Icons.star_half, color: Color(0xFFFFC107), size: 20);
+                      return const Icon(Icons.star_border, color: Color(0xFFFFC107), size: 20);
+                  },
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                '128 Oy',
+                '${_menu.ratingCount} Oy',
                 style: GoogleFonts.inter(
                   color: Colors.grey.shade500,
                   fontSize: 12,
@@ -276,14 +323,16 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
             ],
           ),
           const SizedBox(width: 24),
+          // Progress bars could be dynamic if API returned distribution, but for now specific distribution is not in API response.
+          // Hiding distribution or keeping constant/dummy for now since backend doesn't support it yet
           Expanded(
             child: Column(
               children: [
-                _buildProgressBar(5, 0.8),
-                _buildProgressBar(4, 0.2),
-                _buildProgressBar(3, 0.05),
-                _buildProgressBar(2, 0.02),
-                _buildProgressBar(1, 0.01),
+                _buildProgressBar(5, 0.5), // Dummy distribution
+                _buildProgressBar(4, 0.3),
+                _buildProgressBar(3, 0.1),
+                _buildProgressBar(2, 0.05),
+                _buildProgressBar(1, 0.05),
               ],
             ),
           ),
@@ -399,3 +448,4 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
     );
   }
 }
+

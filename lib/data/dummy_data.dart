@@ -12,6 +12,16 @@ class MenuItem {
     this.calories = 0,
     this.isLiked = false,
   });
+
+  factory MenuItem.fromJson(Map<String, dynamic> json) {
+    return MenuItem(
+      id: json['dish_id'].toString(),
+      name: json['name'],
+      category: json['category'],
+      calories: json['calories'] ?? 0,
+      isLiked: json['is_favorite'] == true || json['is_favorite'] == 1,
+    );
+  }
 }
 
 class Menu {
@@ -19,13 +29,68 @@ class Menu {
   final String dayName;
   final List<MenuItem> items;
   final int totalCalories;
+  final double avgRating;
+  final int ratingCount;
+  final int? userRating;
 
   const Menu({
     required this.date,
     required this.dayName,
     required this.items,
     required this.totalCalories,
+    this.avgRating = 0.0,
+    this.ratingCount = 0,
+    this.userRating,
+    this.originalDate,
+    this.id,
   });
+
+  factory Menu.fromJson(Map<String, dynamic> json) {
+    // Parse date YYYY-MM-DD
+    final dateStr = json['date'] as String;
+    final date = DateTime.parse(dateStr);
+    
+    // Format to "14 Ekim 2023"
+    // Using simple mapping for Turkish months as intl might not be setup for 'tr' without init
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    ];
+    const days = [
+      'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'
+    ];
+    
+    final formattedDate = '${date.day} ${months[date.month - 1]} ${date.year}';
+    final dayName = days[date.weekday - 1];
+
+    var list = json['dishes'] as List;
+    List<MenuItem> itemsList = list.map((i) => MenuItem.fromJson(i)).toList();
+
+    return Menu(
+      date: formattedDate,
+      dayName: dayName,
+      items: itemsList,
+      totalCalories: json['total_calories'] ?? 0, 
+      originalDate: dateStr,
+      id: json['meal_id']?.toString() ?? '',
+      avgRating: _toDouble(json['avg_rating']),
+      ratingCount: json['rating_count'] ?? 0,
+      userRating: json['user_rating'],
+    );
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+        return double.tryParse(value) ?? 0.0;
+    }
+    return 0.0;
+  }
+  
+  // Helper to store original date for API
+  final String? originalDate;
+  final String? id;
 }
 
 class Review {
@@ -42,7 +107,29 @@ class Review {
     required this.comment,
     required this.timeAgo,
   });
+  
+  factory Review.fromJson(Map<String, dynamic> json) {
+    return Review(
+      id: json['comment_id'].toString(),
+      userName: json['name'] ?? 'Anonim',
+      rating: Menu._toDouble(json['user_rating']),
+      comment: json['comment_text'] ?? '',
+      timeAgo: _calculateTimeAgo(json['created_at']),
+    );
+  }
+
+  static String _calculateTimeAgo(String? dateStr) {
+    if (dateStr == null) return '';
+    final date = DateTime.parse(dateStr);
+    final diff = DateTime.now().difference(date);
+    if (diff.inDays > 0) return '${diff.inDays} gün önce';
+    if (diff.inHours > 0) return '${diff.inHours} saat önce';
+    if (diff.inMinutes > 0) return '${diff.inMinutes} dakika önce';
+    return 'Az önce';
+  }
 }
+
+
 
 class DummyData {
   static const List<Menu> lunchMenus = [

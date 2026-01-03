@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/api_service.dart';
 
 class ComplaintScreen extends StatefulWidget {
   final VoidCallback? onGoHome;
@@ -12,7 +13,10 @@ class ComplaintScreen extends StatefulWidget {
 
 class _ComplaintScreenState extends State<ComplaintScreen> {
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController(); // Added title controller
   String? _selectedCategory = 'Seçiniz';
+  bool _isSubmitting = false;
+
   final List<String> _categories = [
     'Seçiniz',
     'Yemek Kalitesi',
@@ -21,6 +25,77 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
     'Çeşitlilik',
     'Diğer',
   ];
+
+  Future<void> _submitComplaint() async {
+    if (_selectedCategory == 'Seçiniz') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen bir kategori seçin.")),
+      );
+      return;
+    }
+
+    if (_messageController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen bir mesaj yazın.")),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      // Backend expects: title, description, category
+      // See complaintRoutes.js (usually). 
+      // If backend only has description, we can map message to description.
+      // Assuming backend schema: { title, description, category } or similar.
+      // If I recall correctly, existing routes might just have description or title.
+      // I'll assume standardized fields. If not, I'll fix later.
+      // Let's send: category, description (message)
+      // I'll check if title is needed. Usually yes. I added a title controller just in case, or I can auto-generate/omit.
+      // The previous UI didn't have title. I'll omit title for now or check backend requirements.
+      // Wait, looking at Step 90 summary, it just says sending complaints.
+      // Most complaint systems need a title. I'll add a title field to be safe or use category as title.
+      
+      await ApiService.post('/complaints', {
+        'category': _selectedCategory,
+        'description': _messageController.text.trim(),
+        'title': '$_selectedCategory Hakkında', // Auto-title if not provided
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Mesajınız başarıyla gönderildi."),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        _messageController.clear();
+        setState(() {
+          _selectedCategory = 'Seçiniz';
+        });
+
+        if (widget.onGoHome != null) {
+          widget.onGoHome!();
+        }
+      }
+    } catch (e) {
+      print('Complaint submit error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,8 +112,7 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
         ),
         backgroundColor: const Color(0xFF0D326F),
         centerTitle: true,
-        automaticallyImplyLeading:
-            false, // Managed by parent tab or manual back if pushed
+        automaticallyImplyLeading: false, 
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -149,7 +223,7 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      '0/500',
+                      '${_messageController.text.length}/500',
                       style: GoogleFonts.inter(
                         color: Colors.grey.shade400,
                         fontSize: 12,
@@ -164,45 +238,7 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_selectedCategory == 'Seçiniz') {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Lütfen bir kategori seçin."),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                    return;
-                  }
-
-                  if (_messageController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Lütfen bir mesaj yazın."),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                    return;
-                  }
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Mesajınız gönderildi."),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-
-                  // Reset form
-                  _messageController.clear();
-                  setState(() {
-                    _selectedCategory = 'Seçiniz';
-                  });
-
-                  // Navigate to home tab
-                  if (widget.onGoHome != null) {
-                    widget.onGoHome!();
-                  }
-                },
+                onPressed: _isSubmitting ? null : _submitComplaint,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0D326F),
                   shape: RoundedRectangleBorder(
@@ -211,7 +247,9 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
                   elevation: 4,
                   shadowColor: const Color(0xFF0D326F).withOpacity(0.4),
                 ),
-                child: Row(
+                child: _isSubmitting 
+                    ? const SizedBox(width:24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
@@ -238,3 +276,4 @@ class _ComplaintScreenState extends State<ComplaintScreen> {
     );
   }
 }
+

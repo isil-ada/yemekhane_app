@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_text_field.dart';
 
+import '../services/auth_service.dart';
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -22,7 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
-  void _navigateToHome() {
+  Future<void> _navigateToHome() async {
     // Validation
     final name = _nameController.text.trim();
     final username = _usernameController.text.trim();
@@ -74,7 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Success Dialog
+    // Show loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -93,7 +95,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Material(
                 color: Colors.transparent,
                 child: Text(
-                  "Kayıt oluşturuldu, giriş yapılıyor...",
+                  "Kayıt oluşturuluyor...",
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     color: Colors.black,
@@ -108,12 +110,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
 
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      // 1. Register
+      await AuthService.register(name, username, email, password);
+      
+      // 2. Login to save data
+       if (mounted) {
+          // Update dialog text
+          Navigator.pop(context); // close register dialog
+          
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => Center(
+                child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Material(
+                        color: Colors.transparent,
+                        child: Text(
+                        "Giriş yapılıyor...",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                        ),
+                        ),
+                    ),
+                    ],
+                ),
+                ),
+            ),
+         );
+       }
+
+      await AuthService.login(email, password);
+
       if (mounted) {
-        Navigator.pop(context); // Close dialog
+        Navigator.pop(context); // Close login dialog
         Navigator.pushReplacementNamed(context, '/home');
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
+    }
   }
 
   void _navigateToLogin() {

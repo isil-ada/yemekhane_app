@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../data/dummy_data.dart';
+import '../services/api_service.dart';
+import '../data/dummy_data.dart'; // For MenuItem model if needed, or use dynamic
 
-class FavoritesScreen extends StatelessWidget {
+class FavoritesScreen extends StatefulWidget {
   final Set<String> likedItems;
   final Function(String) onToggleLike;
 
@@ -13,21 +14,76 @@ class FavoritesScreen extends StatelessWidget {
   });
 
   @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  List<MenuItem> _favorites = []; // Using MenuItem model
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFavorites();
+  }
+
+  @override
+  void didUpdateWidget(covariant FavoritesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Check if the new likedItems set matches our current local data
+    final currentIds = _favorites.map((e) => e.id).toSet();
+    final newIds = widget.likedItems;
+
+    bool isSame = currentIds.length == newIds.length && currentIds.containsAll(newIds);
+
+    if (!isSame) {
+      // Only fetch if there is a discrepancy (e.g. item added from Home)
+      _fetchFavorites();
+    }
+  }
+
+  Future<void> _fetchFavorites() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final data = await ApiService.get('/favorites');
+      if (data is List) {
+        setState(() {
+          _favorites = data.map((e) => MenuItem.fromJson(e)).toList();
+        });
+      }
+    } catch (e) {
+      print('Fetch favorites error: $e');
+    } finally {
+        if (mounted) {
+            setState(() {
+                _isLoading = false;
+            });
+        }
+    }
+  }
+
+  Future<void> _removeFavorite(String dishId) async {
+    // Optimistic UI update
+    setState(() {
+      _favorites.removeWhere((item) => item.id == dishId);
+    });
+    widget.onToggleLike(dishId); // Notify parent to update its state too
+
+    try {
+      await ApiService.delete('/favorites/$dishId');
+    } catch (e) {
+      print('Remove favorite error: $e');
+      // Revert if needed? For now just print.
+      _fetchFavorites(); // Refresh to be safe
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Find all items that are in the likedItems set
-    final allItems = [
-      ...DummyData.lunchMenus.expand((menu) => menu.items),
-      // ...DummyData.dinnerMenus.expand((menu) => menu.items), // Dinner menus not implemented yet
-    ];
-    // Remove duplicates if any (though IDs should be unique)
-    final uniqueItems = {
-      for (var item in allItems) item.id: item,
-    }.values.toList();
-
-    final favoriteItems = uniqueItems
-        .where((item) => likedItems.contains(item.id))
-        .toList();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -43,7 +99,9 @@ class FavoritesScreen extends StatelessWidget {
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),
-      body: favoriteItems.isEmpty
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator()) 
+          : _favorites.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -67,9 +125,9 @@ class FavoritesScreen extends StatelessWidget {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(20),
-              itemCount: favoriteItems.length,
+              itemCount: _favorites.length,
               itemBuilder: (context, index) {
-                final item = favoriteItems[index];
+                final item = _favorites[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(16),
@@ -93,9 +151,15 @@ class FavoritesScreen extends StatelessWidget {
                           color: const Color(0xFFE3F2FD),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.restaurant,
-                          color: Color(0xFF0D326F),
+                        child: Icon(
+                           item.category == 'Başlangıç'
+                              ? Icons.soup_kitchen
+                              : item.category == 'Ana Yemek'
+                              ? Icons.dinner_dining
+                              : item.category == 'Yardımcı Yemek'
+                              ? Icons.rice_bowl
+                              : Icons.emoji_food_beverage,
+                          color: const Color(0xFF0D326F),
                           size: 20,
                         ),
                       ),
@@ -123,7 +187,7 @@ class FavoritesScreen extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => onToggleLike(item.id),
+                        onPressed: () => _removeFavorite(item.id),
                         icon: const Icon(Icons.favorite, color: Colors.red),
                       ),
                     ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_text_field.dart';
 import 'forgot_password_screen.dart';
+import '../services/auth_service.dart';
 
 import '../screens/main_tab_screen.dart';
 
@@ -17,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  void _navigateToHome() {
+  Future<void> _navigateToHome() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Material(
                 color: Colors.transparent,
                 child: Text(
@@ -68,12 +69,23 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
-    Future.delayed(const Duration(seconds: 1, milliseconds: 500), () {
+    try {
+      await AuthService.login(email, password);
+      
       if (mounted) {
         Navigator.pop(context); // Close dialog
         Navigator.pushReplacementNamed(context, '/home');
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close dialog
+        // Remove "Exception: " prefix if present for cleaner display
+        final message = e.toString().replaceAll('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    }
   }
 
   void _navigateToRegister() {

@@ -1,12 +1,85 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/api_service.dart';
 import 'edit_profile_screen.dart';
 import 'login_screen.dart';
+import '../services/auth_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   final VoidCallback? onFavoritesTap;
 
   const ProfileScreen({super.key, this.onFavoritesTap});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Map<String, String> _userData = {
+    'name': 'Yükleniyor...',
+    'email': '...',
+    'username': '...' // Added default for username
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final data = await AuthService.getUserData();
+    if (mounted) {
+      setState(() {
+        _userData = data;
+      });
+    }
+  }
+
+  Future<void> _pickAndUploadImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: source);
+      
+      if (pickedFile != null) {
+         // Show loading?
+         ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('Fotoğraf yükleniyor...')),
+         );
+
+         final path = await ApiService.uploadProfilePicture(pickedFile.path);
+         if (path != null) {
+             await AuthService.updateProfilePicture(path); // Update local storage
+             
+             _loadUserData(); // Refresh to get new path from AuthService
+             ScaffoldMessenger.of(context).showSnackBar(
+                 const SnackBar(content: Text('Profil fotoğrafı güncellendi.')),
+             );
+         } else {
+             ScaffoldMessenger.of(context).showSnackBar(
+                 const SnackBar(content: Text('Yükleme başarısız.')),
+             );
+         }
+      }
+    } catch (e) {
+      print('Pick image error: $e');
+    }
+  }
+
+  Future<void> _removeProfilePicture() async {
+      try {
+          await ApiService.delete('/remove-profile-picture');
+          await AuthService.removeProfilePicture(); // Update local storage
+          
+          _loadUserData();
+          ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('Profil fotoğrafı kaldırıldı.')),
+          );
+      } catch(e) {
+          print('Remove pic error: $e');
+      }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,11 +137,18 @@ class ProfileScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        "Ahmet Yılmaz",
+                        _userData['name'] ?? 'Kullanıcı',
                         style: GoogleFonts.inter(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
                           color: const Color(0xFF1A1D1E),
+                        ),
+                      ),
+                      Text(
+                        _userData['email'] ?? '',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.grey.shade500,
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -77,8 +157,8 @@ class ProfileScreen extends StatelessWidget {
                         icon: Icons.favorite_border,
                         text: "Favoriler",
                         onTap: () {
-                          if (onFavoritesTap != null) {
-                            onFavoritesTap!();
+                          if (widget.onFavoritesTap != null) {
+                            widget.onFavoritesTap!();
                           }
                         },
                       ),
@@ -89,13 +169,15 @@ class ProfileScreen extends StatelessWidget {
                       _buildProfileMenuItem(
                         icon: Icons.edit_outlined,
                         text: "Profili Düzenle",
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                           // Navigate and wait for result (reload if profile updated)
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const EditProfileScreen(),
+                              builder: (_) => EditProfileScreen(userData: _userData),
                             ),
                           );
+                          _loadUserData(); // Refresh data on return
                         },
                       ),
                       const Padding(
@@ -112,8 +194,8 @@ class ProfileScreen extends StatelessWidget {
                             barrierDismissible: false,
                             builder: (context) => Center(
                               child: Container(
-                                padding: EdgeInsets.all(20),
-                                decoration: BoxDecoration(
+                                padding: const EdgeInsets.all(20),
+                                decoration: const BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.all(
                                     Radius.circular(12),
@@ -122,8 +204,8 @@ class ProfileScreen extends StatelessWidget {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    CircularProgressIndicator(),
-                                    SizedBox(height: 16),
+                                    const CircularProgressIndicator(),
+                                    const SizedBox(height: 16),
                                     Text(
                                       "Çıkış yapılıyor...",
                                       style: GoogleFonts.inter(
@@ -138,7 +220,8 @@ class ProfileScreen extends StatelessWidget {
                             ),
                           );
 
-                          Future.delayed(const Duration(seconds: 1), () {
+                          Future.delayed(const Duration(seconds: 1), () async {
+                            await AuthService.logout();
                             if (context.mounted) {
                               Navigator.pop(context); // Close dialog
                               Navigator.pushReplacement(
@@ -175,7 +258,21 @@ class ProfileScreen extends StatelessWidget {
                           ],
                         ),
                         child: Center(
-                          child: Icon(
+                          child: _userData['profile_picture_path'] != null && _userData['profile_picture_path']!.isNotEmpty 
+                            ? ClipOval(
+                                child: Image.network(
+                                    '${ApiService.baseUrl.replaceAll('/api', '')}${_userData['profile_picture_path']}',
+                                    width: 120,
+                                    height: 120,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Icon(
+                                        Icons.person,
+                                        size: 60,
+                                        color: Colors.grey.shade600,
+                                    ),
+                                ),
+                            )
+                            : Icon(
                             Icons.person,
                             size: 60,
                             color: Colors.grey.shade600, // Reverted icon color
@@ -216,7 +313,10 @@ class ProfileScreen extends StatelessWidget {
                                         'Fotoğraf Çek',
                                         style: GoogleFonts.inter(),
                                       ),
-                                      onTap: () => Navigator.pop(context),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _pickAndUploadImage(ImageSource.camera);
+                                      },
                                     ),
                                     ListTile(
                                       leading: const Icon(
@@ -226,8 +326,26 @@ class ProfileScreen extends StatelessWidget {
                                         'Galeriden Seç',
                                         style: GoogleFonts.inter(),
                                       ),
-                                      onTap: () => Navigator.pop(context),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _pickAndUploadImage(ImageSource.gallery);
+                                      },
                                     ),
+                                    if (_userData['profile_picture_path'] != null)
+                                      ListTile(
+                                        leading: const Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
+                                        ),
+                                        title: Text(
+                                          'Fotoğrafı Kaldır',
+                                          style: GoogleFonts.inter(color: Colors.red),
+                                        ),
+                                        onTap: () {
+                                          Navigator.pop(context);
+                                          _removeProfilePicture();
+                                        },
+                                      ),
                                     const SizedBox(height: 12),
                                   ],
                                 ),

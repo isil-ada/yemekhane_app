@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/custom_text_field.dart';
+import '../services/api_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -18,8 +19,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isOldPasswordVisible = false;
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  bool _isLoading = false;
 
-  void _savePassword() {
+  Future<void> _savePassword() async {
     final oldPass = _oldPasswordController.text;
     final newPass = _newPasswordController.text;
     final confirmPass = _confirmPasswordController.text;
@@ -45,11 +47,41 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
-    // Simulate success
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Şifreniz başarıyla değiştirildi.")),
-    );
-    Navigator.pop(context);
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await ApiService.post('/auth/change-password', {
+        'currentPassword': oldPass,
+        'newPassword': newPass,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Şifreniz başarıyla değiştirildi."),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Hata: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -136,7 +168,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _savePassword,
+                onPressed: _isLoading ? null : _savePassword,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0D326F),
                   shape: RoundedRectangleBorder(
@@ -144,7 +176,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   ),
                   elevation: 2,
                 ),
-                child: Text(
+                child: _isLoading 
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text(
                   "Kaydet",
                   style: GoogleFonts.inter(
                     color: Colors.white,

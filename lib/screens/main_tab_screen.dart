@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/api_service.dart';
 import 'home_screen.dart';
 import 'complaint_screen.dart';
 import 'profile_screen.dart';
@@ -10,21 +11,48 @@ class MainTabScreen extends StatefulWidget {
 
   const MainTabScreen({super.key, this.isGuest = false});
 
+  static Route<dynamic> createRoute(Widget page) {
+    return MaterialPageRoute(builder: (_) => page);
+  }
+
   @override
   State<MainTabScreen> createState() => _MainTabScreenState();
 }
 
 class _MainTabScreenState extends State<MainTabScreen> {
   int _currentIndex = 0;
-  final Set<String> _likedItems = {};
+  Set<String> _likedItems = {};
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.isGuest) {
+      _fetchLikedItems();
+    }
+  }
+
+  Future<void> _fetchLikedItems() async {
+    try {
+      final favorites = await ApiService.get('/favorites');
+      if (favorites is List) {
+        setState(() {
+          _likedItems = favorites.map<String>((e) => e['dish_id'].toString()).toSet();
+        });
+      }
+    } catch (e) {
+      print('Error fetching initial favorites: $e');
+    }
+  }
 
   void _toggleLike(String itemId) {
     setState(() {
-      if (_likedItems.contains(itemId)) {
-        _likedItems.remove(itemId);
+      final newSet = Set<String>.from(_likedItems);
+      if (newSet.contains(itemId)) {
+        newSet.remove(itemId);
       } else {
-        _likedItems.add(itemId);
+        newSet.add(itemId);
       }
+      _likedItems = newSet;
     });
   }
 

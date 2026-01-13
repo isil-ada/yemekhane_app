@@ -1,6 +1,6 @@
 ---
 
-# 🍽️ Yemekhane App
+# Yemekhane App
 
 **Yemekhane App**, kampüs yemekhane menülerinin mobil ortamda görüntülenmesini amaçlayan Flutter tabanlı bir mobil uygulamadır.
 Uygulama, kullanıcıların günlük yemek menülerine hızlı ve pratik şekilde erişebilmesini hedefler.
@@ -9,7 +9,7 @@ Bu proje Flutter kullanılarak geliştirilmiş olup Android ve iOS başta olmak 
 
 ---
 
-## 📱 Özellikler
+## Özellikler
 
 * Flutter ile geliştirilmiş çapraz platform mobil uygulama
 * Android, iOS, Web ve masaüstü platform desteği
@@ -19,7 +19,7 @@ Bu proje Flutter kullanılarak geliştirilmiş olup Android ve iOS başta olmak 
 
 ---
 
-## 📁 Proje Yapısı
+## Proje Yapısı
 
 ```
 ├── android/        # Android platform dosyaları
@@ -37,7 +37,7 @@ Bu proje Flutter kullanılarak geliştirilmiş olup Android ve iOS başta olmak 
 
 ---
 
-## 🚀 Kurulum ve Çalıştırma
+## Kurulum ve Çalıştırma
 
 ### Gereksinimler
 
@@ -76,7 +76,7 @@ flutter run
 
 ---
 
-## 🛠 Kullanılan Teknolojiler
+## Kullanılan Teknolojiler
 
 * **Flutter** – Mobil uygulama geliştirme framework’ü
 * **Dart** – Programlama dili
@@ -85,7 +85,7 @@ flutter run
 
 ---
 
-## 🖼️ Ekran Görüntüleri
+## Ekran Görüntüleri
 
 <img width="851" height="1348" alt="image" src="https://github.com/user-attachments/assets/b11942aa-26c4-4314-8c7b-0c205a27efcf" />
 <img width="844" height="1350" alt="image" src="https://github.com/user-attachments/assets/23fc6985-2639-48b7-b862-61e3db822060" />
@@ -103,7 +103,7 @@ flutter run
 
 ---
 
-## 📜 Lisans
+## Lisans
 
 Bu proje **eğitim ve kişisel kullanım** amacıyla geliştirilmiştir.
 İzinsiz olarak kopyalanması, dağıtılması veya ticari amaçlarla kullanılması yasaktır.

@@ -19,7 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, String> _userData = {
     'name': 'Yükleniyor...',
     'email': '...',
-    'username': '...' // Added default for username
+    'username': '...', // Added default for username
   };
 
   @override
@@ -41,26 +41,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(source: source);
-      
-      if (pickedFile != null) {
-         // Show loading?
-         ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text('Fotoğraf yükleniyor...')),
-         );
 
-         final path = await ApiService.uploadProfilePicture(pickedFile.path);
-         if (path != null) {
-             await AuthService.updateProfilePicture(path); // Update local storage
-             
-             _loadUserData(); // Refresh to get new path from AuthService
-             ScaffoldMessenger.of(context).showSnackBar(
-                 const SnackBar(content: Text('Profil fotoğrafı güncellendi.')),
-             );
-         } else {
-             ScaffoldMessenger.of(context).showSnackBar(
-                 const SnackBar(content: Text('Yükleme başarısız.')),
-             );
-         }
+      if (pickedFile != null) {
+        // Show loading?
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Fotoğraf yükleniyor...')));
+
+        final path = await ApiService.uploadProfilePicture(pickedFile);
+        if (path != null) {
+          await AuthService.updateProfilePicture(path); // Update local storage
+
+          _loadUserData(); // Refresh to get new path from AuthService
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profil fotoğrafı güncellendi.')),
+          );
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Yükleme başarısız.')));
+        }
       }
     } catch (e) {
       print('Pick image error: $e');
@@ -68,17 +68,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _removeProfilePicture() async {
-      try {
-          await ApiService.delete('/remove-profile-picture');
-          await AuthService.removeProfilePicture(); // Update local storage
-          
-          _loadUserData();
-          ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text('Profil fotoğrafı kaldırıldı.')),
-          );
-      } catch(e) {
-          print('Remove pic error: $e');
-      }
+    try {
+      await ApiService.delete('/remove-profile-picture');
+      await AuthService.removeProfilePicture(); // Update local storage
+
+      _loadUserData();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil fotoğrafı kaldırıldı.')),
+      );
+    } catch (e) {
+      print('Remove pic error: $e');
+    }
   }
 
   @override
@@ -145,7 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       Text(
-                        _userData['email'] ?? '',
+                        _userData['username'] ?? '',
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           color: Colors.grey.shade500,
@@ -170,11 +170,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.edit_outlined,
                         text: "Profili Düzenle",
                         onTap: () async {
-                           // Navigate and wait for result (reload if profile updated)
+                          // Navigate and wait for result (reload if profile updated)
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => EditProfileScreen(userData: _userData),
+                              builder: (_) =>
+                                  EditProfileScreen(userData: _userData),
                             ),
                           );
                           _loadUserData(); // Refresh data on return
@@ -258,25 +259,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                         child: Center(
-                          child: _userData['profile_picture_path'] != null && _userData['profile_picture_path']!.isNotEmpty 
-                            ? ClipOval(
-                                child: Image.network(
+                          child:
+                              _userData['profile_picture_path'] != null &&
+                                  _userData['profile_picture_path']!.isNotEmpty
+                              ? ClipOval(
+                                  child: Image.network(
                                     '${ApiService.baseUrl.replaceAll('/api', '')}${_userData['profile_picture_path']}',
                                     width: 120,
                                     height: 120,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Icon(
-                                        Icons.person,
-                                        size: 60,
-                                        color: Colors.grey.shade600,
-                                    ),
+                                    errorBuilder:
+                                        (context, error, stackTrace) => Icon(
+                                          Icons.person,
+                                          size: 60,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: Colors
+                                      .grey
+                                      .shade600, // Reverted icon color
                                 ),
-                            )
-                            : Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Colors.grey.shade600, // Reverted icon color
-                          ),
                         ),
                       ),
                       Positioned(
@@ -328,10 +334,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                       onTap: () {
                                         Navigator.pop(context);
-                                        _pickAndUploadImage(ImageSource.gallery);
+                                        _pickAndUploadImage(
+                                          ImageSource.gallery,
+                                        );
                                       },
                                     ),
-                                    if (_userData['profile_picture_path'] != null)
+                                    if (_userData['profile_picture_path'] !=
+                                        null)
                                       ListTile(
                                         leading: const Icon(
                                           Icons.delete_outline,
@@ -339,7 +348,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ),
                                         title: Text(
                                           'Fotoğrafı Kaldır',
-                                          style: GoogleFonts.inter(color: Colors.red),
+                                          style: GoogleFonts.inter(
+                                            color: Colors.red,
+                                          ),
                                         ),
                                         onTap: () {
                                           Navigator.pop(context);

@@ -27,7 +27,7 @@ class NotificationsScreen extends StatelessWidget {
         children: [
           _buildNotificationItem(
             title: 'Yemekhane Menüsü Güncellendi',
-            message: 'Ekim ayı yemek menüsü yayınlanmıştır.',
+            message: 'Aralık ayı yemek menüsü yayınlanmıştır.',
             time: '2 saat önce',
             isUnread: true,
           ),

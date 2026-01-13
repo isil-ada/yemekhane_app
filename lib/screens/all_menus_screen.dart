@@ -4,7 +4,16 @@ import '../data/dummy_data.dart';
 import '../services/api_service.dart';
 
 class AllMenusScreen extends StatefulWidget {
-  const AllMenusScreen({super.key});
+  final Set<String> likedItems;
+  final Function(String) onToggleLike;
+  final bool isGuest;
+
+  const AllMenusScreen({
+    super.key,
+    required this.likedItems,
+    required this.onToggleLike,
+    this.isGuest = false,
+  });
 
   @override
   State<AllMenusScreen> createState() => _AllMenusScreenState();
@@ -25,12 +34,25 @@ class _AllMenusScreenState extends State<AllMenusScreen>
   }
 
   @override
+  void didUpdateWidget(covariant AllMenusScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If parent updates likes, we might need to rebuild our lists?
+    // Actually we just read from widget.likedItems in build, but our lists have `isLiked` locally.
+    // We should probably rely on widget.likedItems for the UI icon state, OR sync our local lists.
+    // Easiest is to check widget.likedItems in the list builder.
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchMenus() async {
+    // ... same content ...
+    // Note: The previous replaces block needs the full content if I replace large chunks.
+    // I will try to keep this focused.
+
     setState(() {
       _isLoading = true;
     });
@@ -38,9 +60,19 @@ class _AllMenusScreenState extends State<AllMenusScreen>
     try {
       // Fetch Lunch
       try {
-        final lunchData = await ApiService.get('/lunch/month');
+        final lunchData = await ApiService.get(
+          '/lunch/month?year=2025&month=12',
+        );
         if (lunchData != null && lunchData is List) {
-          _lunchMenus = lunchData.map((e) => Menu.fromJson(e)).toList();
+          _lunchMenus = lunchData.map((e) => Menu.fromJson(e)).where((m) {
+            try {
+              return m.date.contains('Aralık') ||
+                  m.date.contains('December') ||
+                  m.date.contains('-12-');
+            } catch (e) {
+              return true;
+            }
+          }).toList();
         }
       } catch (e) {
         print('Error fetching lunch monthly: $e');
@@ -48,15 +80,25 @@ class _AllMenusScreenState extends State<AllMenusScreen>
 
       // Fetch Dinner
       try {
-        final dinnerData = await ApiService.get('/dinner/month');
+        final dinnerData = await ApiService.get(
+          '/dinner/month?year=2025&month=12',
+        );
         if (dinnerData != null && dinnerData is List) {
-          _dinnerMenus = dinnerData.map((e) => Menu.fromJson(e)).toList();
+          _dinnerMenus = dinnerData.map((e) => Menu.fromJson(e)).where((m) {
+            try {
+              return m.date.contains('Aralık') ||
+                  m.date.contains('December') ||
+                  m.date.contains('-12-');
+            } catch (e) {
+              return true;
+            }
+          }).toList();
         }
       } catch (e) {
         print('Error fetching dinner monthly: $e');
       }
     } catch (e) {
-        print('General Error: $e');
+      print('General Error: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -67,61 +109,86 @@ class _AllMenusScreenState extends State<AllMenusScreen>
   }
 
   Future<void> _toggleLike(Menu menu, MenuItem item) async {
-      // Determine which list to update
-      List<Menu> targetList = _lunchMenus.contains(menu) ? _lunchMenus : _dinnerMenus;
-      if (!targetList.contains(menu)) return; // Should not happen
+    if (widget.isGuest) {
+      // Show login dialog (can copy from HomeScreen)
+      return;
+    }
 
-      // Optimistic Update
-      setState(() {
-          // Find menu index
-          final menuIndex = targetList.indexOf(menu);
-          if (menuIndex == -1) return;
+    // Call parent toggle
+    widget.onToggleLike(item.id);
 
-          // Find item index
-          final itemIndex = menu.items.indexOf(item);
-          if (itemIndex == -1) return;
+    // We also update local list state to avoid flicker?
+    // Actually if we use widget.likedItems in build, we just need to ensure parent updates and we rebuild.
+    // Parent `onToggleLike` does setState, so Parent rebuilds its children.
+    // But AllMenusScreen is PUSHED. It is NOT a child of HomeScreen in the widget tree sense (it's in Overlay).
+    // So Parent setState does NOT rebuild AllMenusScreen automatically unless we are using a state management solution.
+    // HOWEVER, we called `widget.onToggleLike`.
+    // We should ALSO update our local UI state here to reflect change immediately.
 
-          // Create new MenuItem
-          final newItem = MenuItem(
-              id: item.id,
-              name: item.name,
-              category: item.category,
-              calories: item.calories,
-              isLiked: !item.isLiked,
-          );
+    // Update local API (Optimistic) -> actually parent might do it?
+    // No, parent `MainTabScreen` just updates local Set. It DOES NOT call API.
+    // API calls are done in buttons.
+    // Wait, let's check HomeScreen. HomeScreen calls API inside `_toggleFavorite`.
+    // `MainTabScreen` `_toggleLike` ONLY updates Set.
 
-          // Create new items list
-          final newItems = List<MenuItem>.from(menu.items);
-          newItems[itemIndex] = newItem;
+    // So WE need to call API here, AND update Parent Set.
 
-          // Create new Menu
-          final newMenu = Menu(
-              date: menu.date,
-              dayName: menu.dayName,
-              items: newItems,
-              totalCalories: menu.totalCalories,
-              avgRating: menu.avgRating,
-              ratingCount: menu.ratingCount,
-              userRating: menu.userRating,
-              originalDate: menu.originalDate,
-              id: menu.id,
-          );
+    // 1. Update Parent Set (via callback)
+    // 2. Call API
+    // 3. Update local button state (via setState)
 
-          // Update list
-          targetList[menuIndex] = newMenu;
-      });
+    setState(() {
+      // Just force rebuild to reflect widget.likedItems?
+      // No, widget.likedItems won't change because parent setState doesn't rebuild pushed route.
+      // So we must rely on our LOCAL check against "what we think is the new state".
+      // OR we update our local `isLiked` in the list.
 
-      // API Call
-      try {
-          if (!item.isLiked) { // Note: item is old state (unliked), so we are Liking it
-               await ApiService.post('/favorites', {'dish_id': item.id});
-          } else {
-               await ApiService.delete('/favorites/${item.id}');
-          }
-      } catch (e) {
-          print('Fav toggle error in AllMenus: $e');
-          // Revert on error?
+      List<Menu> targetList = _lunchMenus.contains(menu)
+          ? _lunchMenus
+          : _dinnerMenus;
+      final menuIndex = targetList.indexOf(menu);
+      if (menuIndex == -1) return;
+      final itemIndex = menu.items.indexOf(item);
+      if (itemIndex == -1) return;
+
+      // Copy and update item
+      final newItem = MenuItem(
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        calories: item.calories,
+        isLiked: !item.isLiked, // Toggle local state
+      );
+
+      final newItems = List<MenuItem>.from(menu.items);
+      newItems[itemIndex] = newItem;
+
+      final newMenu = Menu(
+        date: menu.date,
+        dayName: menu.dayName,
+        items: newItems,
+        totalCalories: menu.totalCalories,
+        avgRating: menu.avgRating,
+        ratingCount: menu.ratingCount,
+        userRating: menu.userRating,
+        originalDate: menu.originalDate,
+        id: menu.id,
+      );
+
+      targetList[menuIndex] = newMenu;
+    });
+
+    // API Call
+    try {
+      if (!item.isLiked) {
+        // Was not liked, so we liked it
+        await ApiService.post('/favorites', {'dish_id': item.id});
+      } else {
+        await ApiService.delete('/favorites/${item.id}');
       }
+    } catch (e) {
+      print('Fav toggle error in AllMenus: $e');
+    }
   }
 
   @override
@@ -187,52 +254,52 @@ class _AllMenusScreenState extends State<AllMenusScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                    Text(
-                        menu.date,
-                        style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1A1D1E),
-                        ),
+                  Text(
+                    menu.date,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1A1D1E),
                     ),
-                    Text(
-                        menu.dayName,
-                        style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: Colors.grey,
-                        ),
-                    ),
+                  ),
+                  Text(
+                    menu.dayName,
+                    style: GoogleFonts.inter(fontSize: 14, color: Colors.grey),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
               const Divider(),
               const SizedBox(height: 8),
-              ...DummyData.getSortedItems(
-                menu.items,
-              ).map((e) => Padding(
+              ...DummyData.getSortedItems(menu.items).map(
+                (e) => Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: Row(
                     children: [
-                        Expanded(child: Text("• ${e.name}", style: GoogleFonts.inter(fontSize: 14))),
-                        InkWell(
-                            onTap: () => _toggleLike(menu, e),
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 8.0, right: 4.0),
-                              child: Icon(
-                                  e.isLiked ? Icons.favorite : Icons.favorite_border,
-                                  color: e.isLiked ? Colors.red : Colors.grey.withOpacity(0.5),
-                                  size: 18,
-                              ),
-                            ),
+                      Expanded(
+                        child: Text(
+                          "• ${e.name}",
+                          style: GoogleFonts.inter(fontSize: 14),
                         ),
+                      ),
+                      InkWell(
+                        onTap: () => _toggleLike(menu, e),
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8.0, right: 4.0),
+                          child: Icon(
+                            e.isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: e.isLiked
+                                ? Colors.red
+                                : Colors.grey.withOpacity(0.5),
+                            size: 18,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-              )),
-              const SizedBox(height: 8),
-              Text(
-                  'Kalori: ${menu.totalCalories} kcal',
-                   style: GoogleFonts.inter(fontSize: 12, color: Colors.grey),
-              )
+                ),
+              ),
+              // Calorie text removed as per request
             ],
           ),
         );

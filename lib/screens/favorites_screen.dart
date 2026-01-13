@@ -30,12 +30,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   void didUpdateWidget(covariant FavoritesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     // Check if the new likedItems set matches our current local data
     final currentIds = _favorites.map((e) => e.id).toSet();
     final newIds = widget.likedItems;
 
-    bool isSame = currentIds.length == newIds.length && currentIds.containsAll(newIds);
+    bool isSame =
+        currentIds.length == newIds.length && currentIds.containsAll(newIds);
 
     if (!isSame) {
       // Only fetch if there is a discrepancy (e.g. item added from Home)
@@ -58,11 +59,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     } catch (e) {
       print('Fetch favorites error: $e');
     } finally {
-        if (mounted) {
-            setState(() {
-                _isLoading = false;
-            });
-        }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -99,8 +100,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         centerTitle: true,
         automaticallyImplyLeading: false,
       ),
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator()) 
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
           : _favorites.isEmpty
           ? Center(
               child: Column(
@@ -152,7 +153,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                           item.category == 'Başlangıç'
+                          item.category == 'Başlangıç'
                               ? Icons.soup_kitchen
                               : item.category == 'Ana Yemek'
                               ? Icons.dinner_dining
@@ -177,7 +178,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               ),
                             ),
                             Text(
-                              '${item.calories} kcal',
+                              item.category,
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: Colors.grey.shade500,

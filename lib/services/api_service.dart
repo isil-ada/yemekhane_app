@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:5000/api'; // Adjust for emulator if needed (10.0.2.2 for Android)
+  static const String baseUrl =
+      'http://localhost:5000/api'; // Adjust for emulator if needed (10.0.2.2 for Android)
 
   // Helper to get headers with token
   static Future<Map<String, String>> _getHeaders() async {
@@ -19,11 +21,17 @@ class ApiService {
 
   static Future<dynamic> get(String endpoint) async {
     final headers = await _getHeaders();
-    final response = await http.get(Uri.parse('$baseUrl$endpoint'), headers: headers);
+    final response = await http.get(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: headers,
+    );
     return _handleResponse(response);
   }
 
-  static Future<dynamic> post(String endpoint, Map<String, dynamic> data) async {
+  static Future<dynamic> post(
+    String endpoint,
+    Map<String, dynamic> data,
+  ) async {
     final headers = await _getHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl$endpoint'),
@@ -45,7 +53,10 @@ class ApiService {
 
   static Future<dynamic> delete(String endpoint) async {
     final headers = await _getHeaders();
-    final response = await http.delete(Uri.parse('$baseUrl$endpoint'), headers: headers);
+    final response = await http.delete(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: headers,
+    );
     return _handleResponse(response);
   }
 
@@ -64,10 +75,10 @@ class ApiService {
     }
   }
 
-  static Future<String?> uploadProfilePicture(String filePath) async {
+  static Future<String?> uploadProfilePicture(XFile file) async {
     final uri = Uri.parse('$baseUrl/upload-profile-picture');
     final request = http.MultipartRequest('POST', uri);
-    
+
     // Add headers (Auth)
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -75,18 +86,22 @@ class ApiService {
       request.headers['Authorization'] = 'Bearer $token';
     }
 
-    final mimeType = lookupMimeType(filePath);
+    final bytes = await file.readAsBytes();
+    final mimeType = file.mimeType ?? lookupMimeType(file.name);
     MediaType? mediaType;
     if (mimeType != null) {
       final split = mimeType.split('/');
       mediaType = MediaType(split[0], split[1]);
     }
 
-    request.files.add(await http.MultipartFile.fromPath(
-      'profile_image', 
-      filePath,
-      contentType: mediaType,
-    ));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'profile_image',
+        bytes,
+        filename: file.name,
+        contentType: mediaType,
+      ),
+    );
 
     try {
       final streamedResponse = await request.send();

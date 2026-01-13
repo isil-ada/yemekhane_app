@@ -2,7 +2,7 @@
 
 # Yemekhane App
 
-**Yemekhane App**, kampüs yemekhane menülerinin mobil ortamda görüntülenmesini amaçlayan Flutter tabanlı bir mobil uygulamadır.
+Yemekhane App, kampüs yemekhane menülerinin mobil ortamda görüntülenmesini amaçlayan Flutter tabanlı bir mobil uygulamadır.
 Uygulama, kullanıcıların günlük yemek menülerine hızlı ve pratik şekilde erişebilmesini hedefler.
 
 Bu proje Flutter kullanılarak geliştirilmiş olup Android ve iOS başta olmak üzere çoklu platform desteğine sahiptir.
